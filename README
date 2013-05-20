@@ -1,0 +1,7 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=4590
+
+A completion function that searches the current buffer.  It allows to configure the order of matches and much more.
+
+For more see github and the accompanying blog post:
+http://vertuxeltes.blogspot.de/2013/05/powerful-insert-mode-completion.html
+https://github.com/dirkwallenstein/vim-localcomplete
