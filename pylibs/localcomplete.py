@@ -39,9 +39,9 @@ MATCH_ORDER_REVERSE = 3
 MATCH_ORDER_NORMAL_BELOW_FIRST = 4
 MATCH_ORDER_REVERSE_ABOVE_FIRST = 5
 
-ORIGIN_SIGN_LOCAL = "<< localcomplete"
-ORIGIN_SIGN_DICTIONARY = "<* dict"
-ORIGIN_SIGN_ALL_BUFFERS = "<+ all-buffers"
+CASEMATCH_CONFIG_LOCAL = object()
+CASEMATCH_CONFIG_DICT = object()
+
 
 class LocalCompleteError(Exception):
     """
@@ -58,6 +58,34 @@ def zip_flatten_longest(above_lines, below_lines):
             yield above
         if below is not None:
             yield below
+
+def get_casematch_flag(casematch_config):
+    """
+    Return the re.IGNORECASE or 0 depending on the config request
+    """
+    if casematch_config is CASEMATCH_CONFIG_LOCAL:
+        want_casematch = int(vim.eval("localcomplete#getWantIgnoreCase()"))
+    elif casematch_config is CASEMATCH_CONFIG_DICT:
+        want_casematch = int(vim.eval("localcomplete#getWantIgnoreCaseDict()"))
+    else:
+        raise LocalCompleteError(
+                "localcomplete: Invalid casematch_config argument")
+
+    if want_casematch:
+        return re.IGNORECASE
+    else:
+        return 0
+
+def apply_infercase_to_matches_cond(keyword_base, found_matches):
+    """
+    If both ignorecase and infercase are set in Vim, all matches are
+    transformed to start with the case of the leading word.
+    """
+    if not (int(vim.eval("&ignorecase")) and int(vim.eval("&infercase"))):
+        return found_matches
+    else:
+        len_keyword = len(keyword_base)
+        return [keyword_base + match[len_keyword:] for match in found_matches]
 
 def generate_haystack():
     match_result_order = int(vim.eval("localcomplete#getMatchResultOrder()"))
@@ -168,20 +196,12 @@ def get_additional_keyword_chars():
         return get_additional_keyword_chars_from_vim()
     return keyword_spec
 
-def get_casematch_flag():
-    """
-    Return the re.IGNORECASE or 0 depending on the config request
-    """
-    if int(vim.eval("localcomplete#getWantIgnoreCase()")):
-        return re.IGNORECASE
-    else:
-        return 0
-
 def transmit_local_matches_result_to_vim(found_matches):
+    origin_note = vim.eval("g:localcomplete#OriginNoteLocalcomplete")
     vim.command(VIM_COMMAND_LOCALCOMPLETE
             % repr(produce_result_value(
                     found_matches,
-                    ORIGIN_SIGN_LOCAL)))
+                    origin_note)))
 
 def complete_local_matches():
     """
@@ -196,7 +216,7 @@ def complete_local_matches():
         return
 
     punctuation_chars = get_additional_keyword_chars().decode(encoding)
-    casematch_flag = get_casematch_flag()
+    casematch_flag = get_casematch_flag(CASEMATCH_CONFIG_LOCAL)
 
     # Note: theoretically there could be a non-alphanumerical character at the
     # leftmost position.
@@ -206,6 +226,9 @@ def complete_local_matches():
     found_matches = []
     for buffer_line in generate_haystack():
         found_matches.extend(needle.findall(buffer_line.decode(encoding)))
+
+    found_matches = apply_infercase_to_matches_cond(
+            keyword_base, found_matches)
 
     if os.environ.get("LOCALCOMPLETE_DEBUG") is not None:
         fake_matches = found_matches[:]
@@ -270,9 +293,9 @@ def complete_dictionary_matches():
 
     dictionary_file = vim.eval("&dictionary")
     if dictionary_file:
-        # Case insensitive matches are useless here, unless reordered first.
-        # Would find all the uppercase names before the normal words
-        needle = re.compile(r'^%s\w+' % keyword_base, re.UNICODE|re.MULTILINE)
+        casematch_flag = get_casematch_flag(CASEMATCH_CONFIG_DICT)
+        needle = re.compile(r'^%s\w+' % keyword_base,
+                re.UNICODE|re.MULTILINE|casematch_flag)
         try:
             haystack = read_file_contents(dictionary_file)
         except IOError as err:
@@ -282,10 +305,14 @@ def complete_dictionary_matches():
     else:
         found_matches = []
 
+    found_matches = apply_infercase_to_matches_cond(
+            keyword_base, found_matches)
+
+    origin_note = vim.eval("g:localcomplete#OriginNoteDictionary")
     vim.command(VIM_COMMAND_DICTCOMPLETE
             % repr(produce_result_value(
                     found_matches,
-                    ORIGIN_SIGN_DICTIONARY)))
+                    origin_note)))
 
 def get_current_buffer_index():
     current_buffer_number = vim.current.buffer.number
@@ -307,10 +334,11 @@ def generate_all_buffer_lines():
             yield line
 
 def transmit_all_buffer_result_to_vim(found_matches):
+    origin_note = vim.eval("g:localcomplete#OriginNoteAllBuffers")
     vim.command(VIM_COMMAND_BUFFERCOMPLETE
             % repr(produce_result_value(
                     found_matches,
-                    ORIGIN_SIGN_ALL_BUFFERS)))
+                    origin_note)))
 
 def complete_all_buffer_matches():
     """
@@ -325,7 +353,7 @@ def complete_all_buffer_matches():
         return
 
     punctuation_chars = get_additional_keyword_chars().decode(encoding)
-    casematch_flag = get_casematch_flag()
+    casematch_flag = get_casematch_flag(CASEMATCH_CONFIG_LOCAL)
 
     # Note: theoretically there could be a non-alphanumerical character at the
     # leftmost position.
@@ -335,5 +363,8 @@ def complete_all_buffer_matches():
     found_matches = []
     for buffer_line in generate_all_buffer_lines():
         found_matches.extend(needle.findall(buffer_line.decode(encoding)))
+
+    found_matches = apply_infercase_to_matches_cond(
+            keyword_base, found_matches)
 
     transmit_all_buffer_result_to_vim(found_matches)

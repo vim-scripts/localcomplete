@@ -32,15 +32,31 @@ keyword-char configuration.
 
     localcomplete#dictMatches
 
-Search the dictionary configured in Vim's 'dictionary' setting for matches.
-All matches are done case-insensitively.  It is a very simple function.  The
-dictionary has to be utf-8 encoded.
+Search the file configured in Vim's `'dictionary'` setting for matches.  It can
+optionally search for matches case-insensitively.  The dictionary has to be
+utf-8 encoded.
 
 All three functions can have individual minimum leading word lengths configured
 after which they start to produce results.  This makes only sense in
 combination with ACP.
 
+In addition, all three functions mimic Vim's `'infercase'` behavior.
+
 combinerEXP.vim
 ---------------
 This is a pretty rough and hardcoded module for demonstration purposes.  Please
 read the mentioned blog post for more.
+
+Testing
+-------
+To test, execute `nosetests` from the root directory. For example:
+
+    $> nosetests pylibs.localcomplete_tests
+
+It requires [mock](https://pypi.python.org/pypi/mock)
+
+Installation
+------------
+On how to add this plug-in, I'd like to refer you to
+[Vundle](https://github.com/gmarik/vundle) or
+[Pathogen](https://github.com/tpope/vim-pathogen).

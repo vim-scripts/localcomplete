@@ -60,6 +60,135 @@ class TestZipFlattenLongest(unittest.TestCase):
         self.assertEqual(list(zip_gen_below), [1, 2])
 
 
+class TestGetCasematchFlag(unittest.TestCase):
+
+    def _helper_execute_casematch_flag_test(self,
+            want_ignorecase_local,
+            want_ignorecase_dict,
+            casematch_config,
+            result_flag):
+
+        vim_mock = VimMockFactory.get_mock(
+                want_ignorecase_local=want_ignorecase_local,
+                want_ignorecase_dict=want_ignorecase_dict)
+        with mock.patch(__name__ + '.localcomplete.vim', vim_mock):
+            obtained_flag = localcomplete.get_casematch_flag(casematch_config)
+        self.assertEqual(obtained_flag, result_flag)
+
+    def test_casematch_flag_local_requested_returns_the_python_constant(self):
+        self._helper_execute_casematch_flag_test(
+            want_ignorecase_local=1,
+            want_ignorecase_dict=0,
+            casematch_config=localcomplete.CASEMATCH_CONFIG_LOCAL,
+            result_flag=re.IGNORECASE)
+
+    def test_casematch_flag_local_not_requested_returns_zero(self):
+        self._helper_execute_casematch_flag_test(
+            want_ignorecase_local=0,
+            want_ignorecase_dict=1,
+            casematch_config=localcomplete.CASEMATCH_CONFIG_LOCAL,
+            result_flag=0)
+
+    def test_casematch_flag_dict_requested_returns_the_python_constant(self):
+        self._helper_execute_casematch_flag_test(
+            want_ignorecase_local=0,
+            want_ignorecase_dict=1,
+            casematch_config=localcomplete.CASEMATCH_CONFIG_DICT,
+            result_flag=re.IGNORECASE)
+
+    def test_casematch_flag_dict_not_requested_returns_zero(self):
+        self._helper_execute_casematch_flag_test(
+            want_ignorecase_local=1,
+            want_ignorecase_dict=0,
+            casematch_config=localcomplete.CASEMATCH_CONFIG_DICT,
+            result_flag=0)
+
+    def test_invalid_casematch_config_raises_exception(self):
+        with self.assertRaises(localcomplete.LocalCompleteError):
+            self._helper_execute_casematch_flag_test(
+                want_ignorecase_local=0,
+                want_ignorecase_dict=0,
+                casematch_config=object(),
+                result_flag=0)
+
+
+class TestApplyInfercaseToMatchesCond(unittest.TestCase):
+
+    def _helper_execute_infercase_test(self,
+            vim_ignorecase,
+            vim_infercase,
+            keyword_base,
+            matches_input,
+            matches_result):
+
+        vim_mock = VimMockFactory.get_mock(
+                vim_ignorecase=vim_ignorecase,
+                vim_infercase=vim_infercase)
+        with mock.patch(__name__ + '.localcomplete.vim', vim_mock):
+            actual_result = list(localcomplete.apply_infercase_to_matches_cond(
+                    keyword_base=keyword_base,
+                    found_matches=matches_input))
+        self.assertEqual(actual_result, matches_result)
+
+    def test_matches_are_transformed_if_conditions_are_met(self):
+        """
+        If both ignorecase and infercase are set, all matches are transformed
+        to start with the case of the leading word.
+        """
+        self._helper_execute_infercase_test(
+                vim_ignorecase=1,
+                vim_infercase=1,
+                keyword_base="pri",
+                matches_input=u"PrIory prize PrIority priMary".split(),
+                matches_result=u"priory prize priority priMary".split())
+
+        self._helper_execute_infercase_test(
+                vim_ignorecase=1,
+                vim_infercase=1,
+                keyword_base="PrI",
+                matches_input=u"PrIory prize PrIority priMary".split(),
+                matches_result=u"PrIory PrIze PrIority PrIMary".split())
+
+    def test_no_transformation_happens_if_the_conditions_arent_met(self):
+
+        self._helper_execute_infercase_test(
+                vim_ignorecase=1,
+                vim_infercase=0,
+                keyword_base="pri",
+                matches_input=u"PrIory prize PrIority priMary".split(),
+                matches_result=u"PrIory prize PrIority priMary".split())
+
+        self._helper_execute_infercase_test(
+                vim_ignorecase=0,
+                vim_infercase=1,
+                keyword_base="pri",
+                matches_input=u"PrIory prize PrIority priMary".split(),
+                matches_result=u"PrIory prize PrIority priMary".split())
+
+        self._helper_execute_infercase_test(
+                vim_ignorecase=0,
+                vim_infercase=0,
+                keyword_base="pri",
+                matches_input=u"PrIory prize PrIority priMary".split(),
+                matches_result=u"PrIory prize PrIority priMary".split())
+
+    def test_non_ascii_chars_are_transformed_if_conditions_are_met(self):
+
+        self._helper_execute_infercase_test(
+                vim_ignorecase=1,
+                vim_infercase=1,
+                keyword_base=u"\u00fcb",
+                matches_input=u"\u00dcber \u00fcberfu\u00df".split(),
+                matches_result=u"\u00fcber \u00fcberfu\u00df".split())
+
+        self._helper_execute_infercase_test(
+                vim_ignorecase=1,
+                vim_infercase=1,
+                keyword_base=u"\u00dcb",
+                matches_input=u"\u00dcber \u00fcberfu\u00df".split(),
+                matches_result=u"\u00dcber \u00dcberfu\u00df".split())
+
+
 class TestGenerateHaystack(unittest.TestCase):
 
     def _helper_isolate_sut(self,
@@ -251,28 +380,11 @@ class TestGetAdditionalKeywordChars(unittest.TestCase):
                 keyword_chars_from_vim='.#')
 
 
-class TestGetCasematchFlag(unittest.TestCase):
-
-    def test_casematch_flag_requested_returns_the_python_constant(self):
-        vim_mock = VimMockFactory.get_mock(want_ignorecase=1)
-        with mock.patch(__name__ + '.localcomplete.vim', vim_mock):
-            self.assertEqual(
-                    localcomplete.get_casematch_flag(),
-                    re.IGNORECASE)
-
-    def test_casematch_flag_not_requested_returns_zero(self):
-        vim_mock = VimMockFactory.get_mock(want_ignorecase=0)
-        with mock.patch(__name__ + '.localcomplete.vim', vim_mock):
-            self.assertEqual(
-                    localcomplete.get_casematch_flag(),
-                    0)
-
-
 class TestTransmitLocalMatchResultToVim(unittest.TestCase):
 
     def test_argument_is_passed_through(self):
         produce_mock = mock.Mock(side_effect=lambda matches, origin : matches)
-        vim_mock = VimMockFactory.get_mock()
+        vim_mock = VimMockFactory.get_mock(origin_note_local="undertest")
         with mock.patch.multiple(__name__ + '.localcomplete',
                 produce_result_value=produce_mock,
                 vim=vim_mock):
@@ -302,6 +414,8 @@ class TestCompleteLocalMatches(unittest.TestCase):
         chars_mock = mock.Mock(spec_set=[], return_value=keyword_chars)
         case_mock = mock.Mock(spec_set=[], return_value=case_mock_retval)
         haystack_mock = mock.Mock(spec_set=[], return_value=haystack)
+        infercase_mock = mock.Mock(
+                side_effect=lambda keyword, matches : matches)
         transmit_result_mock = mock.Mock(spec_set=[], return_value=[])
 
         vim_mock = VimMockFactory.get_mock(
@@ -313,6 +427,7 @@ class TestCompleteLocalMatches(unittest.TestCase):
                 get_additional_keyword_chars=chars_mock,
                 get_casematch_flag=case_mock,
                 generate_haystack=haystack_mock,
+                apply_infercase_to_matches_cond=infercase_mock,
                 transmit_local_matches_result_to_vim=transmit_result_mock,
                 vim=vim_mock):
             yield transmit_result_mock
@@ -567,6 +682,8 @@ class TestCompleteDictMatches(unittest.TestCase):
             dict_content,
             keyword_base,
             encoding='utf-8',
+            origin_note_dict='undertest',
+            want_ignorecase=False,
             is_dictionary_configured=True,
             is_dictionary_path_valid=True):
 
@@ -575,10 +692,17 @@ class TestCompleteDictMatches(unittest.TestCase):
         dictionary_path = 'test:nonempty' if is_dictionary_configured else ''
 
         content_mock = mock.Mock(spec_set=[], return_value=translated_content)
+
+        case_mock_retval = re.IGNORECASE if want_ignorecase else 0
+        case_mock = mock.Mock(spec_set=[], return_value=case_mock_retval)
+        infercase_mock = mock.Mock(
+                side_effect=lambda keyword, matches : matches)
+
         if not is_dictionary_path_valid:
             content_mock.side_effect = IOError("undertest")
         produce_mock = mock.Mock(spec_set=[], return_value=[])
         vim_mock = VimMockFactory.get_mock(
+                origin_note_dict=origin_note_dict,
                 encoding=encoding,
                 keyword_base=keyword_base,
                 dictionary=dictionary_path)
@@ -586,6 +710,8 @@ class TestCompleteDictMatches(unittest.TestCase):
         with mock.patch.multiple(__name__ + '.localcomplete',
                 read_file_contents=content_mock,
                 produce_result_value=produce_mock,
+                get_casematch_flag=case_mock,
+                apply_infercase_to_matches_cond=infercase_mock,
                 vim=vim_mock):
 
             yield (vim_mock, produce_mock)
@@ -603,7 +729,15 @@ class TestCompleteDictMatches(unittest.TestCase):
         self._helper_completion_tests(
                 dict_content=u"  priory prize none   Priority   primary  ",
                 keyword_base="pri",
+                want_ignorecase=False,
                 result_list=u"priory prize primary".split())
+
+    def test_find_dict_case_insensitive_matches(self):
+        self._helper_completion_tests(
+                dict_content=u"  priory prize none   Priority   primary  ",
+                keyword_base="pri",
+                want_ignorecase=True,
+                result_list=u"priory prize Priority primary".split())
 
     def test_find_dict_unicode_matches(self):
         self._helper_completion_tests(
@@ -755,7 +889,7 @@ class TestTransmitAllBufferResultToVim(unittest.TestCase):
 
     def test_argument_is_passed_through(self):
         produce_mock = mock.Mock(side_effect=lambda matches, origin : matches)
-        vim_mock = VimMockFactory.get_mock()
+        vim_mock = VimMockFactory.get_mock(origin_note_all_buffers="test")
         with mock.patch.multiple(__name__ + '.localcomplete',
                 produce_result_value=produce_mock,
                 vim=vim_mock):
@@ -781,6 +915,8 @@ class TestCompleteAllBufferMatches(unittest.TestCase):
         case_mock = mock.Mock(spec_set=[], return_value=case_mock_retval)
         buffers_mock = mock.Mock(spec_set=[], return_value=buffers_contents)
         transmit_result_mock = mock.Mock(spec_set=[], return_value=[])
+        infercase_mock = mock.Mock(
+                side_effect=lambda keyword, matches : matches)
 
         vim_mock = VimMockFactory.get_mock(
                 min_len_all_buffer=min_len_all_buffer,
@@ -791,6 +927,7 @@ class TestCompleteAllBufferMatches(unittest.TestCase):
                 get_additional_keyword_chars=chars_mock,
                 get_casematch_flag=case_mock,
                 generate_all_buffer_lines=buffers_mock,
+                apply_infercase_to_matches_cond=infercase_mock,
                 transmit_all_buffer_result_to_vim=transmit_result_mock,
                 vim=vim_mock):
             yield transmit_result_mock

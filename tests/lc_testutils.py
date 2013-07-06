@@ -46,10 +46,16 @@ class VimMockFactory(object):
 
     ConfigMapping = dict(
         match_result_order = "localcomplete#getMatchResultOrder()",
-        want_ignorecase = "localcomplete#getWantIgnoreCase()",
+        want_ignorecase_local = "localcomplete#getWantIgnoreCase()",
+        want_ignorecase_dict = "localcomplete#getWantIgnoreCaseDict()",
+        vim_ignorecase = "&ignorecase",
+        vim_infercase = "&infercase",
         above_count = "localcomplete#getLinesAboveCount()",
         below_count = "localcomplete#getLinesBelowCount()",
         show_origin = "localcomplete#getWantOriginNote()",
+        origin_note_local = "g:localcomplete#OriginNoteLocalcomplete",
+        origin_note_all_buffers = "g:localcomplete#OriginNoteAllBuffers",
+        origin_note_dict = "g:localcomplete#OriginNoteDictionary",
         iskeyword = "&iskeyword",
         encoding = "&encoding",
         keyword_base = "a:keyword_base",

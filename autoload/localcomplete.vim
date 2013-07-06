@@ -11,6 +11,14 @@
 " You should have received a copy of the GNU Lesser General Public License
 " along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
+" File: localcomplete.vim
+" Author: Dirk Wallenstein
+" Description: Combinable completion functions for Vim
+" License: LGPLv3
+" Version: 1.0.1
+
+
 if (exists("g:loaded_localcomplete") && g:loaded_localcomplete)
     finish
 endif
@@ -31,7 +39,7 @@ if ! exists( "g:localcomplete#LinesBelowToSearchCount" )
 endif
 
 if ! exists( "g:localcomplete#WantIgnoreCase" )
-    " Ignore case when looking for matches.
+    " Ignore case when looking for local and all-buffer matches.
     " Override buffer locally with b:LocalCompleteWantIgnoreCase
     let g:localcomplete#WantIgnoreCase = 1
 endif
@@ -91,6 +99,31 @@ if ! exists( "g:localcomplete#AllBuffersMinPrefixLength" )
     " Add local matches if the prefix has this lenght minimum
     " Override buffer locally with b:LocalCompleteAllBuffersMinPrefixLength
     let g:localcomplete#AllBuffersMinPrefixLength = 1
+endif
+
+" =============================================================================
+
+if ! exists( "g:localcomplete#OriginNoteLocalcomplete" )
+    " Change the localcomplete result origin sign.
+    let g:localcomplete#OriginNoteLocalcomplete = '<< localcomplete'
+endif
+
+if ! exists( "g:localcomplete#OriginNoteAllBuffers" )
+    " Change the all-buffers result origin sign.
+    let g:localcomplete#OriginNoteAllBuffers = '<+ all-buffers'
+endif
+
+if ! exists( "g:localcomplete#OriginNoteDictionary" )
+    " Change the dictionary result origin sign.
+    let g:localcomplete#OriginNoteDictionary = '<* dict'
+endif
+
+" =============================================================================
+
+if ! exists( "g:localcomplete#WantIgnoreCaseDict" )
+    " Ignore case when looking for matches in the dictionary
+    " Override buffer locally with b:LocalCompleteWantIgnoreCaseDict
+    let g:localcomplete#WantIgnoreCaseDict = 0
 endif
 
 " =============================================================================
@@ -175,6 +208,14 @@ function localcomplete#getWantIgnoreCase()
     let l:variableList = [
                 \ "b:LocalCompleteWantIgnoreCase",
                 \ "g:localcomplete#WantIgnoreCase"
+                \ ]
+    return s:numericVariableFallback(l:variableList, 1)
+endfunction
+
+function localcomplete#getWantIgnoreCaseDict()
+    let l:variableList = [
+                \ "b:LocalCompleteWantIgnoreCaseDict",
+                \ "g:localcomplete#WantIgnoreCaseDict"
                 \ ]
     return s:numericVariableFallback(l:variableList, 1)
 endfunction
